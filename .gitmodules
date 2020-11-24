@@ -1,0 +1,3 @@
+[submodule "SignalingService/Protos"]
+	path = SignalingService/Protos
+	url = https://github.com/LLJY/Knot-Protos

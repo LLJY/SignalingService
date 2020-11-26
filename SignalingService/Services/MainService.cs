@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -19,7 +20,7 @@ namespace SignalingService
     }
     public class MainService : Signaling.SignalingBase
     {
-        private readonly List<ResponseRef> _responseRefs = new List<ResponseRef>();
+        private static readonly BlockingCollection<ResponseRef> _responseRefs = new();
         public override async Task CallStream(IAsyncStreamReader<Signal> requestStream,
             IServerStreamWriter<Signal> responseStream, ServerCallContext context)
         {

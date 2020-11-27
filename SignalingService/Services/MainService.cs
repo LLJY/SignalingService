@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,36 +8,47 @@ using SignalingService.Protos;
 
 namespace SignalingService
 {
-    public class ResponseRef
-    {
-        public string UserId { get;}
-        public IServerStreamWriter<Signal> ResponseStream { get; }
-
-        public ResponseRef(string userId, IServerStreamWriter<Signal> responseStream)
-        {
-            UserId = userId;
-            ResponseStream = responseStream;
-        }
-    }
     public class MainService : Signaling.SignalingBase
     {
-        private static readonly BlockingCollection<ResponseRef> _responseRefs = new();
+        private static readonly ConcurrentDictionary<string, IServerStreamWriter<Signal>> _responseRefs = new();
+        /**
+         * The task is simple, this server simply acts as a middleman for communication between two clients.
+         */
         public override async Task CallStream(IAsyncStreamReader<Signal> requestStream,
             IServerStreamWriter<Signal> responseStream, ServerCallContext context)
         {
-            while (await requestStream.MoveNext())
+            Action removeResponseStream = () =>
             {
-                var current = requestStream.Current;
-                // starting an initial stream, store it in a list of response references
-                if (current.SenderInfo.IsInit)
+                var rRef = _responseRefs.FirstOrDefault(x => x.Value == responseStream);
+                _responseRefs.TryRemove(rRef);
+            };
+            try
+            {
+                
+                while (await requestStream.MoveNext())
                 {
-                    _responseRefs.Add(new ResponseRef(current.SenderInfo.Userid, responseStream));
+                    var current = requestStream.Current;
+                    // starting an initial stream, store it in a list of response references
+                    if (current.SenderInfo.IsInit)
+                    {
+                        Console.WriteLine($"call has been initialized {current.SenderInfo}");
+                        _responseRefs.TryAdd(current.SenderInfo.Userid, responseStream);
+                    }
+                    // redirect the signal / offer / reply / ice request / ice response to the intended recipient. The frontend should handle the logic of converting between both, we are just a signaling service
+                    else
+                    {
+                        Console.WriteLine("Message Received!");
+                        var response = _responseRefs.FirstOrDefault(x => x.Key == current.RecieverId);
+                        await response.Value.WriteAsync(current);
+                    }
                 }
-                // redirect the signal / offer / reply / ice request / ice response to the intended recipient. The frontend should handle the logic of converting between both, we are just a signaling service
-                else
-                {
-                    _responseRefs.FirstOrDefault(x => x.UserId == current.RecieverId)?.ResponseStream.WriteAsync(current);
-                }
+                // remove any references to the stream once it has ended
+                removeResponseStream();
+            }
+            catch (Exception e)
+            {
+                // remove any references to the stream once it has ended
+                removeResponseStream();
             }
         }
     }

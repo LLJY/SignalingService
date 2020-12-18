@@ -37,9 +37,14 @@ namespace SignalingService
                     // redirect the signal / offer / reply / ice request / ice response to the intended recipient. The frontend should handle the logic of converting between both, we are just a signaling service
                     else
                     {
-                        Console.WriteLine("Message Received!");
+                        Console.WriteLine(current);
                         var response = _responseRefs.FirstOrDefault(x => x.Key == current.RecieverId);
                         await response.Value.WriteAsync(current);
+                    }
+
+                    if (current.SignalAnswer != null)
+                    {
+                        Console.WriteLine("Signal Answer");
                     }
                 }
                 // remove any references to the stream once it has ended
